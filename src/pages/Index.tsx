@@ -1,4 +1,4 @@
-import { CalibrationPanel } from "@/components/calibration/CalibrationPanel";
+import { SimpleCalibrationPanel } from "@/components/calibration/SimpleCalibrationPanel";
 import { Droplets } from "lucide-react";
 
 const Index = () => {
@@ -21,7 +21,7 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <CalibrationPanel />
+        <SimpleCalibrationPanel />
       </main>
 
       {/* Footer */}
