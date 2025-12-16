@@ -1,258 +1,185 @@
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
-// ==========================================
-// MOCK DATA - Replace with real API later
-// ==========================================
-
-// List of sensors (hardcoded for now)
+// ===== MOCK DATA (Replace with real API later) =====
 const SENSORS = [
-  { id: "Device_001_Sensor_1", label: "Device 001 - Sensor 1" },
-  { id: "Device_001_Sensor_2", label: "Device 001 - Sensor 2" },
-  { id: "Device_001_Sensor_3", label: "Device 001 - Sensor 3" },
-  { id: "Device_001_Sensor_4", label: "Device 001 - Sensor 4" },
-  { id: "Device_002_Sensor_1", label: "Device 002 - Sensor 1" },
-  { id: "Device_002_Sensor_2", label: "Device 002 - Sensor 2" },
+  "Device_001_Sensor_1",
+  "Device_001_Sensor_2",
+  "Device_001_Sensor_3",
+  "Device_001_Sensor_4",
+  "Device_002_Sensor_1",
+  "Device_002_Sensor_2",
 ];
 
-// Mock function: Simulates getting count from sensor
-// TODO: Replace with real API call to Raspberry Pi
-async function pollSensor(): Promise<number> {
-  await new Promise((r) => setTimeout(r, 1000)); // Fake delay
-  return Math.floor(Math.random() * 50000) + 10000; // Random number
+// Mock function to get sensor count (replace with real API)
+function pollSensor(): Promise<number> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(Math.floor(Math.random() * 50000) + 10000);
+    }, 1000);
+  });
 }
 
-// Mock function: Saves calibration to server
-// TODO: Replace with real API call
-async function saveToServer(sensorId: string, constant: number): Promise<void> {
-  await new Promise((r) => setTimeout(r, 1000)); // Fake delay
-  console.log("Saved to server:", { sensorId, calibrationConstant: constant });
+// Mock function to save to server (replace with real API)
+function saveToServer(sensorId: string, constant: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("Saved:", { sensorId, calibrationConstant: constant });
+      resolve();
+    }, 1000);
+  });
 }
 
-// ==========================================
-// MAIN COMPONENT
-// ==========================================
-
+// ===== MAIN COMPONENT =====
 export function SimpleCalibrationPanel() {
-  // ----- USER INPUT STATE -----
-  const [selectedSensor, setSelectedSensor] = useState("");
-  const [volume, setVolume] = useState("500"); // Volume in ml
+  // Form inputs
+  const [sensor, setSensor] = useState("");
+  const [volume, setVolume] = useState(500);
 
-  // ----- CALIBRATION STATE -----
+  // Calibration data
   const [isRunning, setIsRunning] = useState(false);
   const [startCount, setStartCount] = useState<number | null>(null);
   const [endCount, setEndCount] = useState<number | null>(null);
+  const [message, setMessage] = useState("Ready");
 
-  // ----- COMPUTED VALUES -----
-  // Calculate difference between end and start counts
-  const countDifference =
-    startCount !== null && endCount !== null ? endCount - startCount : null;
+  // Calculate results
+  const diff = startCount !== null && endCount !== null ? endCount - startCount : null;
+  const constant = diff && diff > 0 ? (volume / diff).toFixed(5) : null;
 
-  // Calculate calibration constant: Volume / CountDifference
-  const calibrationConstant =
-    countDifference !== null && countDifference > 0
-      ? Number((parseFloat(volume) / countDifference).toFixed(5))
-      : null;
-
-  // ----- STATUS STATE -----
-  const [status, setStatus] = useState("Ready to start");
-  const [isSaving, setIsSaving] = useState(false);
-
-  // ==========================================
-  // BUTTON HANDLERS
-  // ==========================================
-
-  // Start calibration: Get the starting count from sensor
-  async function handleStart() {
-    if (!selectedSensor || !volume) {
-      alert("Please select a sensor and enter volume first");
+  // Start calibration
+  async function start() {
+    if (!sensor) {
+      alert("Select a sensor first");
       return;
     }
-
-    setStatus("Getting start count...");
+    setMessage("Getting start count...");
     setIsRunning(true);
-    setEndCount(null); // Reset end count
-
+    setEndCount(null);
     const count = await pollSensor();
     setStartCount(count);
-    setStatus("Calibration running. Pass water through sensor, then click STOP.");
+    setMessage("Running... Pass water through, then click STOP");
   }
 
-  // Stop calibration: Get the ending count and calculate result
-  async function handleStop() {
-    setStatus("Getting end count...");
-
+  // Stop calibration
+  async function stop() {
+    setMessage("Getting end count...");
     let count = await pollSensor();
-
-    // Make sure end count is higher than start (for demo purposes)
-    if (startCount !== null && count <= startCount) {
-      count = startCount + Math.floor(Math.random() * 10000) + 1000;
+    // Ensure end > start for demo
+    if (startCount && count <= startCount) {
+      count = startCount + Math.floor(Math.random() * 5000) + 1000;
     }
-
     setEndCount(count);
     setIsRunning(false);
-    setStatus("Calibration complete! Review results and submit.");
+    setMessage("Done! Review and submit.");
   }
 
-  // Reset everything
-  function handleReset() {
+  // Reset
+  function reset() {
     setStartCount(null);
     setEndCount(null);
     setIsRunning(false);
-    setStatus("Ready to start");
+    setMessage("Ready");
   }
 
-  // Save to server
-  async function handleSubmit() {
-    if (!calibrationConstant) return;
-
-    setIsSaving(true);
-    setStatus("Saving to server...");
-
-    try {
-      await saveToServer(selectedSensor, calibrationConstant);
-      setStatus("✓ Saved successfully!");
-    } catch (error) {
-      setStatus("✗ Failed to save. Try again.");
-    }
-
-    setIsSaving(false);
+  // Save
+  async function submit() {
+    if (!constant) return;
+    setMessage("Saving...");
+    await saveToServer(sensor, parseFloat(constant));
+    setMessage("Saved successfully!");
   }
 
-  // ==========================================
-  // UI RENDER
-  // ==========================================
-
+  // ===== UI =====
   return (
-    <div className="max-w-xl mx-auto p-6 space-y-6">
-      {/* Title */}
-      <h1 className="text-2xl font-bold text-center">Sensor Calibration</h1>
+    <div style={{ maxWidth: 500, margin: "0 auto", padding: 20 }}>
+      <h1 style={{ textAlign: "center", marginBottom: 20 }}>Sensor Calibration</h1>
 
-      {/* Status Message */}
-      <div className="p-3 bg-muted rounded text-center text-sm">{status}</div>
-
-      {/* Step 1: Select Sensor */}
-      <div className="space-y-2">
-        <Label>1. Select Sensor</Label>
-        <Select
-          value={selectedSensor}
-          onValueChange={setSelectedSensor}
-          disabled={isRunning}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Choose a sensor..." />
-          </SelectTrigger>
-          <SelectContent>
-            {SENSORS.map((sensor) => (
-              <SelectItem key={sensor.id} value={sensor.id}>
-                {sensor.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      {/* Status */}
+      <div style={{ background: "#f0f0f0", padding: 10, marginBottom: 20, textAlign: "center", borderRadius: 4 }}>
+        {message}
       </div>
 
-      {/* Step 2: Enter Volume */}
-      <div className="space-y-2">
-        <Label>2. Enter Calibration Volume (ml)</Label>
-        <Input
+      {/* Sensor Select */}
+      <div style={{ marginBottom: 15 }}>
+        <label>1. Select Sensor:</label>
+        <select
+          value={sensor}
+          onChange={(e) => setSensor(e.target.value)}
+          disabled={isRunning}
+          style={{ width: "100%", padding: 8, marginTop: 5 }}
+        >
+          <option value="">-- Choose --</option>
+          {SENSORS.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Volume Input */}
+      <div style={{ marginBottom: 15 }}>
+        <label>2. Volume (ml):</label>
+        <input
           type="number"
           value={volume}
-          onChange={(e) => setVolume(e.target.value)}
-          placeholder="e.g., 500"
+          onChange={(e) => setVolume(Number(e.target.value))}
           disabled={isRunning}
+          style={{ width: "100%", padding: 8, marginTop: 5 }}
         />
       </div>
 
-      {/* Step 3: Start/Stop Buttons */}
-      <div className="space-y-2">
-        <Label>3. Run Calibration</Label>
-        <div className="flex gap-2">
-          <Button
-            onClick={handleStart}
-            disabled={isRunning || !selectedSensor || !volume}
-            className="flex-1"
-          >
+      {/* Buttons */}
+      <div style={{ marginBottom: 15 }}>
+        <label>3. Run Calibration:</label>
+        <div style={{ display: "flex", gap: 10, marginTop: 5 }}>
+          <button onClick={start} disabled={isRunning} style={{ flex: 1, padding: 10 }}>
             START
-          </Button>
-          <Button
-            onClick={handleStop}
-            disabled={!isRunning}
-            variant="secondary"
-            className="flex-1"
-          >
+          </button>
+          <button onClick={stop} disabled={!isRunning} style={{ flex: 1, padding: 10 }}>
             STOP
-          </Button>
-          <Button onClick={handleReset} variant="outline">
+          </button>
+          <button onClick={reset} style={{ padding: 10 }}>
             RESET
-          </Button>
+          </button>
         </div>
       </div>
 
-      {/* Results Display */}
-      <div className="space-y-2">
-        <Label>4. Results</Label>
-        <div className="grid grid-cols-2 gap-3">
-          {/* Start Count */}
-          <div className="p-3 bg-muted rounded">
-            <div className="text-xs text-muted-foreground">Start Count</div>
-            <div className="text-lg font-mono">
-              {startCount !== null ? startCount : "---"}
-            </div>
+      {/* Results */}
+      <div style={{ marginBottom: 15 }}>
+        <label>4. Results:</label>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 5 }}>
+          <div style={{ background: "#f0f0f0", padding: 10, borderRadius: 4 }}>
+            <small>Start Count</small>
+            <div style={{ fontSize: 18, fontFamily: "monospace" }}>{startCount ?? "---"}</div>
           </div>
-
-          {/* End Count */}
-          <div className="p-3 bg-muted rounded">
-            <div className="text-xs text-muted-foreground">End Count</div>
-            <div className="text-lg font-mono">
-              {endCount !== null ? endCount : "---"}
-            </div>
+          <div style={{ background: "#f0f0f0", padding: 10, borderRadius: 4 }}>
+            <small>End Count</small>
+            <div style={{ fontSize: 18, fontFamily: "monospace" }}>{endCount ?? "---"}</div>
           </div>
-
-          {/* Count Difference */}
-          <div className="p-3 bg-muted rounded">
-            <div className="text-xs text-muted-foreground">Count Difference</div>
-            <div className="text-lg font-mono">
-              {countDifference !== null ? countDifference : "---"}
-            </div>
+          <div style={{ background: "#f0f0f0", padding: 10, borderRadius: 4 }}>
+            <small>Difference</small>
+            <div style={{ fontSize: 18, fontFamily: "monospace" }}>{diff ?? "---"}</div>
           </div>
-
-          {/* Calibration Constant */}
-          <div className="p-3 bg-primary/10 rounded border border-primary/30">
-            <div className="text-xs text-muted-foreground">
-              Calibration Constant
-            </div>
-            <div className="text-lg font-mono font-bold text-primary">
-              {calibrationConstant !== null ? calibrationConstant : "---"}
-            </div>
+          <div style={{ background: "#e0f7fa", padding: 10, borderRadius: 4, border: "1px solid #00897b" }}>
+            <small>Calibration Constant</small>
+            <div style={{ fontSize: 18, fontFamily: "monospace", fontWeight: "bold" }}>{constant ?? "---"}</div>
           </div>
         </div>
       </div>
 
-      {/* Submit Button */}
-      <div className="space-y-2">
-        <Label>5. Save to Server</Label>
-        <Button
-          onClick={handleSubmit}
-          disabled={!calibrationConstant || isSaving}
-          className="w-full"
+      {/* Submit */}
+      <div style={{ marginBottom: 15 }}>
+        <label>5. Save:</label>
+        <button
+          onClick={submit}
+          disabled={!constant}
+          style={{ width: "100%", padding: 12, marginTop: 5, background: "#00897b", color: "white", border: "none", borderRadius: 4 }}
         >
-          {isSaving ? "Saving..." : "SUBMIT CALIBRATION"}
-        </Button>
+          SUBMIT
+        </button>
       </div>
 
-      {/* Formula Explanation */}
-      <div className="text-xs text-muted-foreground border-t pt-4 mt-6">
-        <strong>Formula:</strong> CalibrationConstant = Volume ÷ (EndCount - StartCount)
+      {/* Formula */}
+      <div style={{ fontSize: 12, color: "#666", borderTop: "1px solid #ddd", paddingTop: 10 }}>
+        <b>Formula:</b> Constant = Volume ÷ (EndCount - StartCount)
       </div>
     </div>
   );
